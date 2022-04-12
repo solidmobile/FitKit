@@ -29,10 +29,10 @@ class FitKit {
   /// #### It's not advised to call `await FitKit.read(dataType)` without any extra parameters. This can lead to FAILED BINDER TRANSACTION on Android devices because of the data batch size being too large.
   static Future<List<FitData>> read(
     DataType type, {
-    DateTime dateFrom,
-    DateTime dateTo,
-    int limit,
-    int interval,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int? limit,
+    int? interval,
   }) async {
     return await _channel.invokeListMethod('read', {
       "type": _dataTypeToString(type),
@@ -41,11 +41,11 @@ class FitKit {
       "limit": limit,
       "interval": interval ?? 60,
     }).then(
-      (response) => response.map((item) => FitData.fromJson(item)).toList(),
+      (response) => response!.map((item) => FitData.fromJson(item)).toList(),
     );
   }
 
-  static Future<FitData> readLast(DataType type) async {
+  static Future<FitData?> readLast(DataType type) async {
     return await read(type, limit: 1)
         .then((results) => results.isEmpty ? null : results[0]);
   }
@@ -77,7 +77,6 @@ class FitKit {
       case DataType.WAIST_CIRCUMFERENCE:
         return "waist_circumference";
     }
-    throw Exception('dataType $type not supported');
   }
 }
 

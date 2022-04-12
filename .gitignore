@@ -8,3 +8,6 @@ build/
 .idea/
 *.iml
 flutter_export_environment.sh
+.fvm/flutter_sdk
+.fvm/fvm_config.json
+.vscode/settings.json

@@ -13,15 +13,15 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String result = '';
   Map<DataType, List<FitData>> results = Map();
-  bool permissions;
+  late bool permissions = false;
 
   RangeValues _dateRange = RangeValues(1, 8);
-  List<DateTime> _dates = List<DateTime>();
+  List<DateTime?> _dates = [];
   double _limitRange = 0;
 
-  DateTime get _dateFrom => _dates[_dateRange.start.round()];
-  DateTime get _dateTo => _dates[_dateRange.end.round()];
-  int get _limit => _limitRange == 0.0 ? null : _limitRange.round();
+  DateTime? get _dateFrom => _dates[_dateRange.start.round()];
+  DateTime? get _dateTo => _dates[_dateRange.end.round()];
+  int? get _limit => _limitRange == 0.0 ? null : _limitRange.round();
 
   @override
   void initState() {
@@ -63,8 +63,6 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       result = 'readAll: $e';
     }
-
-    setState(() {});
   }
 
   Future<void> revokePermissions() async {
@@ -110,7 +108,7 @@ class _MyAppState extends State<MyApp> {
             children: [
               Padding(padding: EdgeInsets.symmetric(vertical: 8)),
               Text(
-                  'Date Range: ${_dateToString(_dateFrom)} - ${_dateToString(_dateTo)}'),
+                  'Date Range: ${_dateToString(_dateFrom!)} - ${_dateToString(_dateTo!)}'),
               Text('Limit: $_limit'),
               Text('Permissions: $permissions'),
               Text('Result: $result'),
@@ -126,8 +124,8 @@ class _MyAppState extends State<MyApp> {
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
                         child: Text(
-                          '$item - ${results[item].length}',
-                          style: Theme.of(context).textTheme.title,
+                          '$item - ${results[item]?.length}',
+                          style: Theme.of(context).textTheme.headline6,
                         ),
                       );
                     } else if (item is FitData) {
@@ -155,6 +153,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   String _dateToString(DateTime dateTime) {
+    // ignore: unnecessary_null_comparison
     if (dateTime == null) {
       return 'null';
     }
@@ -200,18 +199,20 @@ class _MyAppState extends State<MyApp> {
     return Row(
       children: [
         Expanded(
-          child: FlatButton(
-            color: Theme.of(context).accentColor,
-            textColor: Colors.white,
+          child: TextButton(
+            style: TextButton.styleFrom(
+                primary: Theme.of(context).colorScheme.secondary,
+                textStyle: const TextStyle(color: Colors.white)),
             onPressed: () => read(),
             child: Text('Read'),
           ),
         ),
         Padding(padding: EdgeInsets.symmetric(horizontal: 4)),
         Expanded(
-          child: FlatButton(
-            color: Theme.of(context).accentColor,
-            textColor: Colors.white,
+          child: TextButton(
+            style: TextButton.styleFrom(
+                primary: Theme.of(context).colorScheme.secondary,
+                textStyle: const TextStyle(color: Colors.white)),
             onPressed: () => revokePermissions(),
             child: Text('Revoke permissions'),
           ),
