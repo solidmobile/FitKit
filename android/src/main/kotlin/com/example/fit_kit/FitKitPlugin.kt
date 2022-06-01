@@ -15,7 +15,6 @@ import com.google.android.gms.fitness.request.SessionReadRequest
 import com.google.android.gms.fitness.result.DataReadResponse
 import com.google.android.gms.fitness.result.SessionReadResponse
 import android.content.Intent
-import android.content.Context
 import androidx.annotation.NonNull;
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -32,7 +31,6 @@ import java.util.concurrent.TimeUnit
 class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandler,FlutterPlugin,ActivityResultListener,ActivityAware {
 
     private lateinit var registrar : Registrar
-    private lateinit var context: Context
     private var activity: Activity? = null
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -44,6 +42,12 @@ class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandl
         channel?.setMethodCallHandler(null)
         activity = null
     }
+
+    interface OAuthPermissionsListener {
+        fun onOAuthPermissionsResult(resultCode: Int)
+    }
+
+    private val oAuthPermissionListeners = mutableListOf<OAuthPermissionsListener>()
 
     companion object {
         private const val TAG = "FitKit"
@@ -60,21 +64,13 @@ class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandl
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        Log.d("FLUTTER_HEALTH", requestCode.toString())
-        Log.d("FLUTTER_HEALTH", resultCode.toString())
+        Log.d("FLUTTER_HEALTH", "REQUEST_CODE $requestCode")
+        Log.d("FLUTTER_HEALTH", "RESULT_CODE $resultCode")
         if (requestCode == GOOGLE_FIT_REQUEST_CODE) {
-            if (resultCode == Activity.RESULT_OK) {
-                Log.d("FLUTTER_HEALTH", "Access Granted!")
-                mResult?.success(true)
-            } else if (resultCode == Activity.RESULT_CANCELED) {
-                Log.d("FLUTTER_HEALTH", "Access Denied!")
-                mResult?.success(false)
-            }
+            oAuthPermissionListeners.forEach { it.onOAuthPermissionsResult(resultCode) }
         }
         return false
     }
-
-    private var mResult: Result? = null
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
@@ -123,38 +119,28 @@ class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandl
     }
 
     private fun hasPermissions(request: PermissionsRequest, result: Result) {
-        if (activity == null) {
-            result.success(false)
-            return
-        }
 
         val options = FitnessOptions.builder()
                 .addDataTypes(request.types.map { it.dataType })
                 .build()
 
-        mResult = result
-
-        val isGranted = hasOAuthPermission(options)
-        mResult?.success(isGranted)
+        if (hasOAuthPermission(options)) {
+            result.success(true)
+        } else {
+            result.success(false)
+        }
     }
 
     private fun requestPermissions(request: PermissionsRequest, result: Result) {
-        if (activity == null) {
-            result.success(false)
-            return
-        }
 
         val options = FitnessOptions.builder()
                 .addDataTypes(request.types.map { it.dataType })
                 .build()
 
-        mResult = result
         requestOAuthPermissions(options, {
-            //result.success(true)
-            mResult?.success(true)
+            result.success(true)
         }, {
-            //result.success(false)
-            mResult?.success(false)
+            result.success(false)
         })
     }
 
@@ -207,20 +193,29 @@ class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandl
 
     private fun requestOAuthPermissions(fitnessOptions: FitnessOptions, onSuccess: () -> Unit, onError: () -> Unit) {
 
-        val isGranted = hasOAuthPermission(fitnessOptions)
-
-        /// Not granted? Ask for permission
-        if (!isGranted && activity != null) {
-            GoogleSignIn.requestPermissions(
-                    activity!!,
-                    GOOGLE_FIT_REQUEST_CODE,
-                    GoogleSignIn.getLastSignedInAccount(activity),
-                    fitnessOptions)
-        }
-        /// Permission already granted
-        else {
+        if (hasOAuthPermission(fitnessOptions)) {
             onSuccess()
+            return
         }
+
+        oAuthPermissionListeners.add(object : OAuthPermissionsListener {
+            override fun onOAuthPermissionsResult(resultCode: Int) {
+                if (resultCode == Activity.RESULT_OK) {
+                    Log.d("FLUTTER_HEALTH", "Google Access Granted!")
+                    onSuccess()
+                } else if (resultCode == Activity.RESULT_CANCELED) {
+                    Log.d("FLUTTER_HEALTH", "Google Access Denied!")
+                    onError()
+                }
+                oAuthPermissionListeners.remove(this)
+            }
+        })
+
+        GoogleSignIn.requestPermissions(
+                activity!!,
+                GOOGLE_FIT_REQUEST_CODE,
+                GoogleSignIn.getLastSignedInAccount(activity),
+                fitnessOptions)
     }
 
     private fun hasOAuthPermission(fitnessOptions: FitnessOptions): Boolean {
@@ -230,6 +225,7 @@ class FitKitPlugin(private var channel: MethodChannel? = null) : MethodCallHandl
     private fun readSample(request: ReadRequest<Type.Sample>, result: Result) {
         Log.d(TAG, "readSample: ${request.type}")
         Log.d(TAG, "INTERVAL: ${request.interval}");
+        Log.d(TAG, "RESULT: $result");
         val readRequest = DataReadRequest.Builder()
                 .read(request.type.dataType)
                 .also { builder ->

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fit_kit/fit_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() => runApp(MyApp());
 
@@ -25,6 +26,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
+    rPermission();
     super.initState();
 
     final now = DateTime.now();
@@ -43,11 +45,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> read() async {
     results.clear();
+    String r = '';
+    bool p = false;
 
     try {
-      permissions = await FitKit.requestPermissions(DataType.values);
-      if (!permissions) {
-        result = 'requestPermissions: failed';
+      p = await FitKit.requestPermissions(DataType.values);
+      if (!p) {
+        r = 'requestPermissions: failed';
       } else {
         for (DataType type in DataType.values) {
           results[type] = await FitKit.read(
@@ -58,11 +62,18 @@ class _MyAppState extends State<MyApp> {
           );
         }
 
-        result = 'readAll: success';
+        r = 'readAll: success';
       }
     } catch (e) {
-      result = 'readAll: $e';
+      r = 'readAll: $e';
     }
+
+    if (!mounted) return;
+
+    setState(() {
+      result = r;
+      permissions = p;
+    });
   }
 
   Future<void> revokePermissions() async {
@@ -77,6 +88,11 @@ class _MyAppState extends State<MyApp> {
     }
 
     setState(() {});
+  }
+
+  Future<void> rPermission() async {
+    final p = await Permission.activityRecognition.request();
+    print('Permission Status $p');
   }
 
   Future<void> hasPermissions() async {
